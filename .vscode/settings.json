@@ -1,3 +1,22 @@
 {
-    "dart.flutterSdkPath": "/Users/imadchikh/wesh-timeline-mobile-v1/.fvm/versions/3.38.5"
+    "dart.flutterSdkPath": "/Users/imadchikh/wesh-timeline-mobile-v1/.fvm/versions/3.38.5",
+    "workbench.colorCustomizations": {
+        // "activityBar.activeBackground": "#d6d6d2",
+        // "activityBar.background": "#d6d6d2",
+        // "activityBar.foreground": "#15202b",
+        // "activityBar.inactiveForeground": "#15202b99",
+        // "activityBarBadge.background": "#308f8f",
+        // // "activityBarBadge.foreground": "#e7e7e7",
+        // "commandCenter.border": "#15202b99",
+        // // "sash.hoverBorder": "#d6d6d2",
+        // // "statusBar.background": "#bebeb7",
+        // "statusBar.foreground": "#15202b",
+        // // "statusBarItem.hoverBackground": "#a6a69c",
+        // // "statusBarItem.remoteBackground": "#bebeb7",
+        // "statusBarItem.remoteForeground": "#15202b",
+        // "titleBar.activeBackground": "#bebeb7",
+        // "titleBar.activeForeground": "#15202b",
+        // "titleBar.inactiveBackground": "#bebeb799",
+        // "titleBar.inactiveForeground": "#15202b99"
+    }
 }
