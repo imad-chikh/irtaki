@@ -25,6 +25,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.13.4"
+  arabic_justified_text:
+    dependency: "direct main"
+    description:
+      name: arabic_justified_text
+      sha256: "4089b27ceb6fb98e358d33d3b928e31e4d1ec3ffb6240f0cc3ee1147ad4b0f57"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.0.8"
   args:
     dependency: transitive
     description:

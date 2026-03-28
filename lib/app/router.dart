@@ -1,9 +1,10 @@
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../features/fihras/fihras_screen.dart';
 import '../features/reader/reader_screen.dart';
-import '../features/settings/settings_screen.dart';
 import '../features/search/search_screen.dart';
+import '../features/settings/settings_screen.dart';
 
 final router = GoRouter(
   initialLocation: '/',
@@ -30,7 +31,9 @@ final router = GoRouter(
       builder: (context, state) {
         final pageStr = state.pathParameters['page'];
         final page = int.tryParse(pageStr ?? '1') ?? 1;
-        return ReaderScreen(initialPage: page);
+        final surahStr = state.uri.queryParameters['surah'];
+        final initialSurah = int.tryParse(surahStr ?? '');
+        return ReaderScreen(initialPage: page, initialSurah: initialSurah);
       },
     ),
     GoRoute(path: '/search', builder: (context, state) => const SearchScreen()),

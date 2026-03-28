@@ -32,7 +32,12 @@ flutter:
   uses-material-design: true
   assets:
     - assets/db/quran_warsh.db
+    - assets/json/_meta.json
+    - assets/json/warsh_complet.json
   fonts:
+    - family: KFGQPCWarshOthmanTahaFont
+      fonts:
+        - asset: assets/fonts/uthmanic_warsh.ttf
     - family: UthmaniWarsh
       fonts:
         - asset: assets/fonts/uthmanic_warsh.ttf
