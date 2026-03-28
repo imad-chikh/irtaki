@@ -1,6 +1,8 @@
 name: irtaki
 description: مصحف ورش عن نافع
 
+version: 0.0.1+1
+
 environment:
   sdk: ">=3.10.4 <4.0.0"
 
@@ -16,6 +18,8 @@ dependencies:
   just_audio: ^0.9.38
   shared_preferences: ^2.2.3
   flutter_svg: ^2.0.10
+  # Text rendering
+  arabic_justified_text: ^0.0.8
 
 dev_dependencies:
   flutter_test:
@@ -29,6 +33,9 @@ flutter:
   assets:
     - assets/db/quran_warsh.db
   fonts:
+    - family: UthmaniWarsh
+      fonts:
+        - asset: assets/fonts/uthmanic_warsh.ttf
     - family: me_quran
       fonts:
         - asset: assets/fonts/me_quran.ttf

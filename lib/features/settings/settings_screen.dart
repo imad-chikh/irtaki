@@ -52,7 +52,7 @@ class SettingsScreen extends ConsumerWidget {
                     child: Text(
                       'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ',
                       style: TextStyle(
-                        fontFamily: 'me_quran',
+                        fontFamily: 'UthmaniWarsh',
                         fontSize: settings.fontSize,
                       ),
                     ),

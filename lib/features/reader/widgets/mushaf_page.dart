@@ -139,10 +139,10 @@ class MushafPage extends StatelessWidget {
       spans.add(
         TextSpan(
           // Strip Arabic Presentation Form waqf/pause markers (U+FC00–U+FDFF)
-          // These only render correctly in the Warsh-variant me_quran font.
+          // These only render correctly in a Warsh-variant Quran font.
           text: _cleanText(verse.ayaText),
           style: TextStyle(
-            fontFamily: 'me_quran',
+            fontFamily: 'UthmaniWarsh',
             fontSize: fontSize,
             height: 1.85,
             color: textColor,
@@ -187,7 +187,7 @@ class MushafPage extends StatelessWidget {
 
   /// Remove Arabic Presentation Form characters (U+FB50–U+FDFF) that are
   /// Waqf/pause marks in Tanzil Warsh encoding. They render correctly only
-  /// in the Warsh variant of me_quran; strip until that font is available.
+  /// in a Warsh-variant Quran font; strip until full glyph coverage is available.
   static String _cleanText(String raw) {
     return raw.replaceAll(RegExp('[\uFB50-\uFDFF\uFE70-\uFEFF]'), '').trim();
   }

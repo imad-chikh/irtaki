@@ -42,7 +42,7 @@ class SurahBanner extends StatelessWidget {
             child: Center(
               child: Text(
                 'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ',
-                style: TextStyle(fontFamily: 'me_quran', fontSize: 22),
+                style: TextStyle(fontFamily: 'UthmaniWarsh', fontSize: 22),
               ),
             ),
           ),

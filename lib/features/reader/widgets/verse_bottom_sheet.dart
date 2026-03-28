@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../../../core/models/verse.dart';
+
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/models/verse.dart';
 
 class VerseBottomSheet extends StatelessWidget {
   final Verse verse;
@@ -10,8 +11,6 @@ class VerseBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
@@ -46,7 +45,7 @@ class VerseBottomSheet extends StatelessWidget {
               child: Text(
                 verse.ayaText,
                 style: const TextStyle(
-                  fontFamily: 'me_quran',
+                  fontFamily: 'UthmaniWarsh',
                   fontSize: 24,
                   height: 2.0,
                 ),

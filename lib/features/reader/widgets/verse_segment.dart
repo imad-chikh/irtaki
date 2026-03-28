@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../../../core/models/verse.dart';
+
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/models/verse.dart';
 import '../../../shared/verse_number_badge.dart';
 
 class VerseSegment extends StatelessWidget {
@@ -35,7 +36,7 @@ class VerseSegment extends StatelessWidget {
             TextSpan(
               text: verse.ayaText,
               style: TextStyle(
-                fontFamily: 'me_quran',
+                fontFamily: 'UthmaniWarsh',
                 fontSize: fontSize,
                 height: 2.2, // CRITICAL: room for diacritics
                 color: textColor,

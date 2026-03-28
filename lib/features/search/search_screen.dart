@@ -79,7 +79,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     title: Text(
                       verse.ayaText,
                       style: TextStyle(
-                        fontFamily: 'me_quran',
+                        fontFamily: 'UthmaniWarsh',
                         fontSize: settings.fontSize * 0.8,
                         height: 2.0,
                       ),
