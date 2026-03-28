@@ -1,7 +1,8 @@
 import 'package:sqflite/sqflite.dart';
-import 'database_helper.dart';
+
 import '../models/surah.dart';
 import '../models/verse.dart';
+import 'database_helper.dart';
 
 class QuranDao {
   Future<Database> get _db => DatabaseHelper.database;
@@ -28,11 +29,9 @@ class QuranDao {
   // Returns verses ordered by their line_start, which matches Mushaf order
   Future<List<Verse>> getVersesByPage(int page) async {
     final db = await _db;
-    final rows = await db.query(
-      'verses',
-      where: 'page = ?',
-      whereArgs: [page],
-      orderBy: 'line_start ASC, aya_no ASC',
+    final rows = await db.rawQuery(
+      'SELECT * FROM verses WHERE CAST(page AS INTEGER) = ? ORDER BY line_start ASC, aya_no ASC',
+      [page],
     );
     return rows.map(Verse.fromMap).toList();
   }
@@ -55,7 +54,7 @@ class QuranDao {
     final result = await db.rawQuery(
       'SELECT MAX(page) as max_page FROM verses',
     );
-    return result.first['max_page'] as int;
+    return int.parse(result.first['max_page'].toString());
   }
 
   // Which page does a surah start on?

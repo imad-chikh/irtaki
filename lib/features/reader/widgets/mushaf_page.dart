@@ -1,9 +1,11 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import '../../../../core/models/verse.dart';
+
 import '../../../../core/constants/app_colors.dart';
-import 'mushaf_line.dart';
-import 'page_header.dart';
+import '../../../../core/models/verse.dart';
+import '../../../shared/verse_number_badge.dart';
 import 'page_footer.dart';
+import 'page_header.dart';
 import 'surah_banner.dart';
 import 'verse_bottom_sheet.dart';
 
@@ -23,106 +25,153 @@ class MushafPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (verses.isEmpty) return const SizedBox.shrink();
-
-    final firstVerse = verses.first;
-    final juzLabel = 'الجزء ${_toEasternArabic(firstVerse.juz)}';
-
-    // ── Group verse fragments by physical line number ──────────────────────
-    final Map<int, List<Verse>> lineMap = {};
-    for (final verse in verses) {
-      for (int line = verse.lineStart; line <= verse.lineEnd; line++) {
-        lineMap.putIfAbsent(line, () => []).add(verse);
-      }
-    }
-    final sortedLines = lineMap.keys.toList()..sort();
-
-    // ── Detect surah changes on this page (for Basmala banners) ───────────
-    final suraChanges = <int>{};
-    if (verses.length > 1) {
-      for (int i = 1; i < verses.length; i++) {
-        if (verses[i].suraNo != verses[i - 1].suraNo) {
-          suraChanges.add(verses[i].suraNo);
-        }
-      }
-    }
+    if (verses.isEmpty) return const SizedBox.expand();
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final firstVerse = verses.first;
+    final juzLabel = 'الجزء ${_ar(firstVerse.juz)}';
+
+    // ── De-duplicate: DB query returns verses sorted by line_start,aya_no.
+    // Each verse appears once. This list is the ground truth for the page.
+    final pageVerses = _deduplicate(verses);
+
+    // ── Detect surah headers needed on this page ─────────────────────────────
+    //    A surah banner is needed whenever aya_no == 1 appears.
+    final Set<int> surahBannerAyaIds = {};
+    for (final v in pageVerses) {
+      if (v.ayaNo == 1) surahBannerAyaIds.add(v.id);
+    }
 
     return Container(
       color: isDark ? AppColors.pageDark : AppColors.pageLight,
       child: Column(
         children: [
-          // ── Page header ─────────────────────────────────────────────────
+          // ── Top bar ────────────────────────────────────────────────────────
           PageHeader(surahName: firstVerse.suraNameAr, juzLabel: juzLabel),
 
-          // ── Page content ─────────────────────────────────────────────────
+          // ── Page body ──────────────────────────────────────────────────────
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: _buildLines(
-                  context,
-                  sortedLines,
-                  lineMap,
-                  suraChanges,
-                  firstVerse,
-                ),
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 14.0),
+              child: _buildBody(context, pageVerses, surahBannerAyaIds),
             ),
           ),
 
-          // ── Page footer ─────────────────────────────────────────────────
+          // ── Bottom bar ─────────────────────────────────────────────────────
           PageFooter(pageNumber: pageNumber),
         ],
       ),
     );
   }
 
-  List<Widget> _buildLines(
+  // ── Lay out banners + a single flowing Text.rich per "surah section" ────────
+  Widget _buildBody(
     BuildContext context,
-    List<int> sortedLines,
-    Map<int, List<Verse>> lineMap,
-    Set<int> suraChanges,
-    Verse firstVerse,
+    List<Verse> pageVerses,
+    Set<int> surahBannerAyaIds,
   ) {
-    final widgets = <Widget>[];
+    // Split page into sections separated by surah start banners
+    final sections = <_PageSection>[];
+    var currentSpans = <Verse>[];
+    String? currentHeader;
+    bool? currentHasBasmala;
 
-    // If page is starting with Basmala
-    if (firstVerse.ayaNo == 1 && sortedLines.isNotEmpty) {
-      widgets.add(
-        SurahBanner(
-          surahName: firstVerse.suraNameAr,
-          hasBasmala: firstVerse.suraNo != 9,
-        ),
-      );
-    }
-
-    for (final lineNum in sortedLines) {
-      final lineVerses = lineMap[lineNum]!;
-
-      // Insert surah banner BEFORE this line if a new surah starts here
-      for (final v in lineVerses) {
-        if (suraChanges.contains(v.suraNo) && v.lineStart == lineNum) {
-          widgets.add(
-            SurahBanner(surahName: v.suraNameAr, hasBasmala: v.suraNo != 9),
+    for (final verse in pageVerses) {
+      if (surahBannerAyaIds.contains(verse.id)) {
+        // Save previous section
+        if (currentSpans.isNotEmpty || currentHeader != null) {
+          sections.add(
+            _PageSection(
+              headerName: currentHeader,
+              hasBasmala: currentHasBasmala ?? false,
+              verses: List.from(currentSpans),
+            ),
           );
         }
+        currentSpans = [];
+        currentHeader = verse.suraNameAr;
+        currentHasBasmala = verse.suraNo != 9;
       }
+      currentSpans.add(verse);
+    }
+    // Final section
+    sections.add(
+      _PageSection(
+        headerName: currentHeader,
+        hasBasmala: currentHasBasmala ?? false,
+        verses: currentSpans,
+      ),
+    );
 
-      widgets.add(
-        MushafLine(
-          lineNumber: lineNum,
-          verses: lineVerses,
-          showTajweed: showTajweed,
-          fontSize: fontSize,
-          onVerseTap: (verse) => _showVerseSheet(context, verse),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final section in sections) ...[
+          if (section.headerName != null)
+            SurahBanner(
+              surahName: section.headerName!,
+              hasBasmala: section.hasBasmala,
+            ),
+          if (section.verses.isNotEmpty)
+            Expanded(
+              flex: _totalLineSpan(section.verses),
+              child: _buildFlowingText(context, section.verses),
+            ),
+        ],
+      ],
+    );
+  }
+
+  /// A single RTL-justified Text.rich containing all verse text in order.
+  /// This mirrors a real Mushaf: words flow continuously, verse numbers inline.
+  Widget _buildFlowingText(BuildContext context, List<Verse> sectionVerses) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark
+        ? AppColors.primaryTextDark
+        : AppColors.primaryTextLight;
+
+    final spans = <InlineSpan>[];
+
+    for (final verse in sectionVerses) {
+      final recognizer = TapGestureRecognizer()
+        ..onTap = () => _showVerseSheet(context, verse);
+
+      spans.add(
+        TextSpan(
+          // Strip Arabic Presentation Form waqf/pause markers (U+FC00–U+FDFF)
+          // These only render correctly in the Warsh-variant me_quran font.
+          text: _cleanText(verse.ayaText),
+          style: TextStyle(
+            fontFamily: 'me_quran',
+            fontSize: fontSize,
+            height: 1.85,
+            color: textColor,
+          ),
+          recognizer: recognizer,
         ),
       );
+
+      // Inline verse-number badge after each verse
+      spans.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: VerseNumberBadge(number: verse.ayaNo),
+          ),
+        ),
+      );
+
+      spans.add(const TextSpan(text: ' '));
     }
 
-    return widgets;
+    return Center(
+      child: Text.rich(
+        TextSpan(children: spans),
+        textDirection: TextDirection.rtl,
+        textAlign: TextAlign.justify,
+      ),
+    );
   }
 
   void _showVerseSheet(BuildContext context, Verse verse) {
@@ -134,8 +183,45 @@ class MushafPage extends StatelessWidget {
     );
   }
 
-  static String _toEasternArabic(int n) {
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  /// Remove Arabic Presentation Form characters (U+FB50–U+FDFF) that are
+  /// Waqf/pause marks in Tanzil Warsh encoding. They render correctly only
+  /// in the Warsh variant of me_quran; strip until that font is available.
+  static String _cleanText(String raw) {
+    return raw.replaceAll(RegExp('[\uFB50-\uFDFF\uFE70-\uFEFF]'), '').trim();
+  }
+
+  static List<Verse> _deduplicate(List<Verse> verses) {
+    final seen = <int>{};
+    return verses.where((v) => seen.add(v.id)).toList();
+  }
+
+  static int _totalLineSpan(List<Verse> verses) {
+    if (verses.isEmpty) return 1;
+    final minLine = verses
+        .map((v) => v.lineStart)
+        .reduce((a, b) => a < b ? a : b);
+    final maxLine = verses
+        .map((v) => v.lineEnd)
+        .reduce((a, b) => a > b ? a : b);
+    return (maxLine - minLine + 1).clamp(1, 100);
+  }
+
+  static String _ar(int n) {
     const d = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
     return n.toString().split('').map((c) => d[int.parse(c)]).join();
   }
+}
+
+// ── Data class ────────────────────────────────────────────────────────────────
+class _PageSection {
+  final String? headerName;
+  final bool hasBasmala;
+  final List<Verse> verses;
+  const _PageSection({
+    required this.headerName,
+    required this.hasBasmala,
+    required this.verses,
+  });
 }

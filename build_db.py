@@ -47,9 +47,13 @@ c.execute('''
 ''')
 
 # ── 5. Insert verses ─────────────────────────────────────────────────────────
-df_renamed = df.rename(columns={
-    'jozz': 'juz',
-})
+df_renamed = df.rename(columns={'jozz': 'juz'})
+
+# Force numeric columns to Python int so SQLite sees them as INTEGER
+int_cols = ['id', 'juz', 'page', 'sura_no', 'line_start', 'line_end', 'aya_no']
+for col in int_cols:
+    df_renamed[col] = df_renamed[col].astype(int)
+
 df_renamed.to_sql('verses', conn, if_exists='replace', index=False)
 print("Inserted verses ✓")
 
