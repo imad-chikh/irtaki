@@ -103,22 +103,20 @@ class MushafPage extends StatelessWidget {
       ),
     );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final section in sections) ...[
-          if (section.headerName != null)
-            SurahBanner(
-              surahName: section.headerName!,
-              hasBasmala: section.hasBasmala,
-            ),
-          if (section.verses.isNotEmpty)
-            Expanded(
-              flex: _totalLineSpan(section.verses),
-              child: _buildFlowingText(context, section.verses),
-            ),
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final section in sections) ...[
+            if (section.headerName != null)
+              SurahBanner(
+                surahName: section.headerName!,
+                hasBasmala: section.hasBasmala,
+              ),
+            if (section.verses.isNotEmpty) _buildFlowingText(context, section.verses),
+          ],
         ],
-      ],
+      ),
     );
   }
 
@@ -195,17 +193,6 @@ class MushafPage extends StatelessWidget {
   static List<Verse> _deduplicate(List<Verse> verses) {
     final seen = <int>{};
     return verses.where((v) => seen.add(v.id)).toList();
-  }
-
-  static int _totalLineSpan(List<Verse> verses) {
-    if (verses.isEmpty) return 1;
-    final minLine = verses
-        .map((v) => v.lineStart)
-        .reduce((a, b) => a < b ? a : b);
-    final maxLine = verses
-        .map((v) => v.lineEnd)
-        .reduce((a, b) => a > b ? a : b);
-    return (maxLine - minLine + 1).clamp(1, 100);
   }
 
   static String _ar(int n) {
