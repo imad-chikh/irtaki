@@ -1,3 +1,4 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../core/database/quran_dao.dart';
@@ -6,7 +7,7 @@ import '../../core/models/surah.dart';
 part 'fihras_provider.g.dart';
 
 @riverpod
-Future<List<Surah>> allSurahs(AllSurahsRef ref) {
+Future<List<Surah>> allSurahs(Ref ref) {
   return QuranDao().getAllSurahs();
 }
 
@@ -23,7 +24,7 @@ class SearchQuery extends _$SearchQuery {
 }
 
 @riverpod
-Future<List<Surah>> filteredSurahs(FilteredSurahsRef ref) async {
+Future<List<Surah>> filteredSurahs(Ref ref) async {
   final all = await ref.watch(allSurahsProvider.future);
   final query = ref.watch(searchQueryProvider);
   if (query.isEmpty) return all;

@@ -11,7 +11,7 @@ class OrnamentalDivider extends StatelessWidget {
         child: Container(
           width: 200,
           height: 1,
-          color: Theme.of(context).dividerColor.withOpacity(0.5),
+          color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
         ),
       ),
     );

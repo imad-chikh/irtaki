@@ -49,7 +49,7 @@ class _SurahBadgePainter extends CustomPainter {
     canvas.drawCircle(
       Offset(cx, cy),
       r,
-      Paint()..color = AppColors.verseCircleFill.withOpacity(0.5),
+      Paint()..color = AppColors.verseCircleFill.withValues(alpha: 0.5),
     );
 
     final borderPaint = Paint()

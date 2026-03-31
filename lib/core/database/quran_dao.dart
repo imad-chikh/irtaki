@@ -7,6 +7,12 @@ import 'database_helper.dart';
 class QuranDao {
   Future<Database> get _db => DatabaseHelper.database;
 
+  Future<List<Verse>> getAllVerses() async {
+    final db = await _db;
+    final rows = await db.query('verses');
+    return rows.map(Verse.fromMap).toList();
+  }
+
   // All 114 surahs (for Fihras screen)
   Future<List<Surah>> getAllSurahs() async {
     final db = await _db;

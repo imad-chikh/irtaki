@@ -26,15 +26,15 @@ class Verse {
   });
 
   factory Verse.fromMap(Map<String, dynamic> m) => Verse(
-    id: int.parse(m['id'].toString()),
-    juz: int.parse(m['juz'].toString()),
-    page: int.parse(m['page'].toString()),
-    suraNo: int.parse(m['sura_no'].toString()),
+    id: _parseIntField(m, 'id'),
+    juz: _parseIntField(m, 'juz'),
+    page: _parseIntField(m, 'page'),
+    suraNo: _parseIntField(m, 'sura_no'),
     suraNameEn: m['sura_name_en'].toString(),
     suraNameAr: m['sura_name_ar'].toString(),
-    lineStart: int.parse(m['line_start'].toString()),
-    lineEnd: int.parse(m['line_end'].toString()),
-    ayaNo: int.parse(m['aya_no'].toString()),
+    lineStart: _parseIntField(m, 'line_start'),
+    lineEnd: _parseIntField(m, 'line_end'),
+    ayaNo: _parseIntField(m, 'aya_no'),
     ayaText: m['aya_text'].toString(),
   );
 
@@ -46,5 +46,29 @@ class Verse {
   static String _toEasternArabic(int n) {
     const d = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
     return n.toString().split('').map((c) => d[int.parse(c)]).join();
+  }
+
+  static int _parseIntField(Map<String, dynamic> map, String key) {
+    final value = map[key];
+    if (value is int) {
+      return value;
+    }
+    if (value is num) {
+      return value.toInt();
+    }
+
+    final raw = value?.toString() ?? '';
+    final direct = int.tryParse(raw);
+    if (direct != null) {
+      return direct;
+    }
+
+    // Handle legacy/page-range values like "85-86" by taking the first number.
+    final match = RegExp(r'\d+').firstMatch(raw);
+    if (match != null) {
+      return int.parse(match.group(0)!);
+    }
+
+    throw FormatException('Invalid integer value for "$key": $raw');
   }
 }

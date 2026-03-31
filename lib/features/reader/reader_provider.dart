@@ -1,3 +1,4 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../core/database/quran_dao.dart';
@@ -6,12 +7,12 @@ import '../../core/models/verse.dart';
 part 'reader_provider.g.dart';
 
 @riverpod
-Future<List<Verse>> versesForPage(VersesForPageRef ref, int page) {
+Future<List<Verse>> versesForPage(Ref ref, int page) {
   return QuranDao().getVersesByPage(page);
 }
 
 @riverpod
-Future<int> totalPages(TotalPagesRef ref) {
+Future<int> totalPages(Ref ref) {
   return QuranDao().getTotalPages();
 }
 
