@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/database/quran_dao.dart';
 import 'fihras_provider.dart';
 import 'widgets/surah_tile.dart';
 
@@ -83,8 +84,12 @@ class _FihrasScreenState extends ConsumerState<FihrasScreen> {
                 final surah = surahs[index];
                 return SurahTile(
                   surah: surah,
-                  onTap: () {
-                    context.push('/reader/1?surah=${surah.suraNo}');
+                  onTap: () async {
+                    final page = await QuranDao().getPageForSura(surah.suraNo);
+                    if (!context.mounted) {
+                      return;
+                    }
+                    context.push('/reader/$page');
                   },
                 );
               },

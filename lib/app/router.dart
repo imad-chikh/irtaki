@@ -33,7 +33,11 @@ final router = GoRouter(
         final page = int.tryParse(pageStr ?? '1') ?? 1;
         final surahStr = state.uri.queryParameters['surah'];
         final initialSurah = int.tryParse(surahStr ?? '');
-        return ReaderScreen(initialPage: page, initialSurah: initialSurah);
+        return ReaderScreen(
+          key: state.pageKey,
+          initialPage: page,
+          initialSurah: initialSurah,
+        );
       },
     ),
     GoRoute(path: '/search', builder: (context, state) => const SearchScreen()),

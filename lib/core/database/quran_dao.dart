@@ -52,13 +52,25 @@ class QuranDao {
   Future<int> getTotalPages() async {
     final db = await _db;
     final result = await db.rawQuery(
-      'SELECT MAX(page) as max_page FROM verses',
+      'SELECT MAX(CAST(page AS INTEGER)) as max_page FROM verses',
     );
     return int.parse(result.first['max_page'].toString());
   }
 
   // Which page does a surah start on?
   Future<int> getPageForSura(int suraNo) async {
+    final db = await _db;
+    final result = await db.rawQuery(
+      'SELECT MIN(CAST(page AS INTEGER)) as first_page FROM verses WHERE sura_no = ?',
+      [suraNo],
+    );
+
+    final firstPage = result.first['first_page'];
+    if (firstPage != null) {
+      return int.parse(firstPage.toString());
+    }
+
+    // Fallback to surahs table metadata if verse rows are unexpectedly missing.
     final surah = await getSurah(suraNo);
     return surah.pageStart;
   }
