@@ -14,6 +14,8 @@ class MushafPage extends StatelessWidget {
   final List<Verse> verses;
   final bool showTajweed;
   final double fontSize;
+  final int? selectedVerseId;
+  final ValueChanged<int> onVerseSelected;
 
   const MushafPage({
     super.key,
@@ -21,6 +23,8 @@ class MushafPage extends StatelessWidget {
     required this.verses,
     required this.showTajweed,
     required this.fontSize,
+    required this.selectedVerseId,
+    required this.onVerseSelected,
   });
 
   @override
@@ -113,7 +117,8 @@ class MushafPage extends StatelessWidget {
                 surahName: section.headerName!,
                 hasBasmala: section.hasBasmala,
               ),
-            if (section.verses.isNotEmpty) _buildFlowingText(context, section.verses),
+            if (section.verses.isNotEmpty)
+              _buildFlowingText(context, section.verses),
           ],
         ],
       ),
@@ -127,12 +132,16 @@ class MushafPage extends StatelessWidget {
     final textColor = isDark
         ? AppColors.primaryTextDark
         : AppColors.primaryTextLight;
+    final selectedBg = isDark
+        ? const Color(0x334D90FE)
+        : const Color(0x33E8C84A);
 
     final spans = <InlineSpan>[];
 
     for (final verse in sectionVerses) {
       final recognizer = TapGestureRecognizer()
-        ..onTap = () => _showVerseSheet(context, verse);
+        ..onTap = () => _onVerseTap(context, verse);
+      final isSelected = selectedVerseId == verse.id;
 
       spans.add(
         TextSpan(
@@ -144,6 +153,7 @@ class MushafPage extends StatelessWidget {
             fontSize: fontSize,
             height: 1.85,
             color: textColor,
+            backgroundColor: isSelected ? selectedBg : null,
           ),
           recognizer: recognizer,
         ),
@@ -172,13 +182,15 @@ class MushafPage extends StatelessWidget {
     );
   }
 
-  void _showVerseSheet(BuildContext context, Verse verse) {
-    showModalBottomSheet(
+  Future<void> _onVerseTap(BuildContext context, Verse verse) async {
+    onVerseSelected(verse.id);
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => VerseBottomSheet(verse: verse),
     );
+    onVerseSelected(-1);
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────

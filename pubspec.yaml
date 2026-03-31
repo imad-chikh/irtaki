@@ -18,8 +18,6 @@ dependencies:
   just_audio: ^0.9.38
   shared_preferences: ^2.2.3
   flutter_svg: ^2.0.10
-  # Text rendering
-  arabic_justified_text: ^0.0.8
 
 dev_dependencies:
   flutter_test:
@@ -32,8 +30,6 @@ flutter:
   uses-material-design: true
   assets:
     - assets/db/quran_warsh.db
-    - assets/json/_meta.json
-    - assets/json/warsh_complet.json
   fonts:
     - family: KFGQPCWarshOthmanTahaFont
       fonts:

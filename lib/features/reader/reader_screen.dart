@@ -20,6 +20,7 @@ class ReaderScreen extends ConsumerStatefulWidget {
 class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   late final PageController _pageController;
   late final Future<int> _initialTargetPageFuture;
+  final Map<int, int> _selectedVerseByPage = <int, int>{};
   bool _didInitialJump = false;
 
   @override
@@ -105,6 +106,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                       verses: verses,
                       showTajweed: settings.showTajweed,
                       fontSize: settings.fontSize,
+                      selectedVerseId: _selectedVerseByPage[page],
+                      onVerseSelected: (verseId) {
+                        setState(() {
+                          if (verseId < 0) {
+                            _selectedVerseByPage.remove(page);
+                          } else {
+                            _selectedVerseByPage[page] = verseId;
+                          }
+                        });
+                      },
                     ),
                   );
                 },
