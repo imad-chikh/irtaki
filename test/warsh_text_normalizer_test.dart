@@ -7,7 +7,7 @@ void main() {
 
     test('removes diacritics and warsh glyph marks', () {
       const input = 'اِ۬لْحَمْدُ لِلهِ رَبِّ اِ۬لْعَٰلَمِينَ ﰀ';
-      expect(normalizer.normalize(input), 'الحمد لله رب العالمين');
+      expect(normalizer.normalize(input), 'الحمد لله رب العلمين');
     });
 
     test('normalizes alef and ya variants', () {

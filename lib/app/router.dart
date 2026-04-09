@@ -3,8 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/models/verse.dart';
 import '../features/fihras/fihras_screen.dart';
-import '../features/recitation/recitation_check_screen.dart';
 import '../features/reader/reader_screen.dart';
+import '../features/recitation/recitation_check_screen.dart';
 import '../features/search/search_screen.dart';
 import '../features/settings/settings_screen.dart';
 
@@ -35,10 +35,13 @@ final router = GoRouter(
         final page = int.tryParse(pageStr ?? '1') ?? 1;
         final surahStr = state.uri.queryParameters['surah'];
         final initialSurah = int.tryParse(surahStr ?? '');
+        final verseStr = state.uri.queryParameters['verse'];
+        final initialVerseId = int.tryParse(verseStr ?? '');
         return ReaderScreen(
           key: state.pageKey,
           initialPage: page,
           initialSurah: initialSurah,
+          initialVerseId: initialVerseId,
         );
       },
     ),

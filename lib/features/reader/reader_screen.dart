@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,8 +12,14 @@ import 'widgets/mushaf_page.dart';
 class ReaderScreen extends ConsumerStatefulWidget {
   final int initialPage;
   final int? initialSurah;
+  final int? initialVerseId;
 
-  const ReaderScreen({super.key, required this.initialPage, this.initialSurah});
+  const ReaderScreen({
+    super.key,
+    required this.initialPage,
+    this.initialSurah,
+    this.initialVerseId,
+  });
 
   @override
   ConsumerState<ReaderScreen> createState() => _ReaderScreenState();
@@ -22,6 +30,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   late final Future<int> _initialTargetPageFuture;
   final Map<int, int> _selectedVerseByPage = <int, int>{};
   bool _didInitialJump = false;
+  Timer? _initialHighlightTimer;
 
   @override
   void initState() {
@@ -32,6 +41,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   @override
   void dispose() {
+    _initialHighlightTimer?.cancel();
     _pageController.dispose();
     super.dispose();
   }
@@ -70,60 +80,66 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           ),
         ],
       ),
-      body: ref.watch(totalPagesProvider).when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
-        data: (totalPages) => FutureBuilder<int>(
-          future: _initialTargetPageFuture,
-          builder: (context, initialPageSnapshot) {
-            final targetInitialPage = initialPageSnapshot.data?.clamp(
-              1,
-              totalPages,
-            );
-            if (targetInitialPage != null) {
-              _scheduleInitialJump(targetInitialPage);
-            }
+      body: ref
+          .watch(totalPagesProvider)
+          .when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('Error: $e')),
+            data: (totalPages) => FutureBuilder<int>(
+              future: _initialTargetPageFuture,
+              builder: (context, initialPageSnapshot) {
+                final targetInitialPage = initialPageSnapshot.data?.clamp(
+                  1,
+                  totalPages,
+                );
+                if (targetInitialPage != null) {
+                  _scheduleInitialJump(targetInitialPage);
+                }
 
-            return Directionality(
-              textDirection: TextDirection.rtl,
-              child: PageView.builder(
-                itemCount: totalPages,
-                controller: _pageController,
-                onPageChanged: (index) {
-                  final page = index + 1;
-                  ref.read(settingsNotifierProvider.notifier).setLastPage(page);
-                },
-                itemBuilder: (context, index) {
-                  final page = index + 1;
-                  final versesAsync = ref.watch(versesForPageProvider(page));
+                return Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: PageView.builder(
+                    itemCount: totalPages,
+                    controller: _pageController,
+                    onPageChanged: (index) {
+                      final page = index + 1;
+                      ref
+                          .read(settingsNotifierProvider.notifier)
+                          .setLastPage(page);
+                    },
+                    itemBuilder: (context, index) {
+                      final page = index + 1;
+                      final versesAsync = ref.watch(
+                        versesForPageProvider(page),
+                      );
 
-                  return versesAsync.when(
-                    loading: () =>
-                        const Center(child: CircularProgressIndicator()),
-                    error: (e, _) => Center(child: Text('Error: $e')),
-                    data: (verses) => MushafPage(
-                      pageNumber: page,
-                      verses: verses,
-                      showTajweed: settings.showTajweed,
-                      fontSize: settings.fontSize,
-                      selectedVerseId: _selectedVerseByPage[page],
-                      onVerseSelected: (verseId) {
-                        setState(() {
-                          if (verseId < 0) {
-                            _selectedVerseByPage.remove(page);
-                          } else {
-                            _selectedVerseByPage[page] = verseId;
-                          }
-                        });
-                      },
-                    ),
-                  );
-                },
-              ),
-            );
-          },
-        ),
-      ),
+                      return versesAsync.when(
+                        loading: () =>
+                            const Center(child: CircularProgressIndicator()),
+                        error: (e, _) => Center(child: Text('Error: $e')),
+                        data: (verses) => MushafPage(
+                          pageNumber: page,
+                          verses: verses,
+                          showTajweed: settings.showTajweed,
+                          fontSize: settings.fontSize,
+                          selectedVerseId: _selectedVerseByPage[page],
+                          onVerseSelected: (verseId) {
+                            setState(() {
+                              if (verseId < 0) {
+                                _selectedVerseByPage.remove(page);
+                              } else {
+                                _selectedVerseByPage[page] = verseId;
+                              }
+                            });
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
     );
   }
 
@@ -145,10 +161,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     if (_didInitialJump) {
       return;
     }
+    _didInitialJump = true;
 
     final targetIndex = targetPage - 1;
     if (targetIndex == _pageController.initialPage) {
-      _didInitialJump = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        _applyInitialVerseHighlight(targetPage);
+      });
       return;
     }
 
@@ -158,7 +180,31 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       }
       _pageController.jumpToPage(targetIndex);
       ref.read(settingsNotifierProvider.notifier).setLastPage(targetPage);
+      _applyInitialVerseHighlight(targetPage);
     });
-    _didInitialJump = true;
+  }
+
+  void _applyInitialVerseHighlight(int page) {
+    final verseId = widget.initialVerseId;
+    if (verseId == null) {
+      return;
+    }
+
+    setState(() {
+      _selectedVerseByPage[page] = verseId;
+    });
+
+    _initialHighlightTimer?.cancel();
+    _initialHighlightTimer = Timer(const Duration(seconds: 3), () {
+      if (!mounted) {
+        return;
+      }
+      if (_selectedVerseByPage[page] != verseId) {
+        return;
+      }
+      setState(() {
+        _selectedVerseByPage.remove(page);
+      });
+    });
   }
 }

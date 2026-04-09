@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'dart:isolate';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/models/verse.dart';
+import '../ai/asr/asr_coordinator.dart';
+import '../ai/asr/asr_types.dart';
+import '../ai/asr/default_asr_coordinator.dart';
 import '../ai/models/recitation_feedback.dart';
 import '../ai/search/recitation_feedback_analyzer.dart';
-import '../ai/services/native_arabic_stt_service.dart';
-import '../ai/services/speech_recognition_service.dart';
 
 enum _RecitationState { idle, listening, processing, error }
 
@@ -19,18 +22,19 @@ class RecitationCheckScreen extends StatefulWidget {
 }
 
 class _RecitationCheckScreenState extends State<RecitationCheckScreen> {
-  final NativeArabicSttService _sttService = NativeArabicSttService();
+  final AsrCoordinator _asrCoordinator = createDefaultAsrCoordinator();
   final RecitationFeedbackAnalyzer _analyzer = RecitationFeedbackAnalyzer();
 
   _RecitationState _state = _RecitationState.idle;
   String _transcript = '';
   String? _error;
   bool _canOpenSettings = false;
+  AsrEngineType? _lastEngineType;
   RecitationFeedbackResult? _feedback;
 
   @override
   void dispose() {
-    _sttService.dispose();
+    _asrCoordinator.dispose();
     super.dispose();
   }
 
@@ -103,6 +107,7 @@ class _RecitationCheckScreenState extends State<RecitationCheckScreen> {
                     ),
                   ),
                   if (_canOpenSettings)
+                    // ignore: prefer_const_constructors
                     TextButton(
                       onPressed: openAppSettings,
                       child: const Text('فتح الإعدادات'),
@@ -116,7 +121,11 @@ class _RecitationCheckScreenState extends State<RecitationCheckScreen> {
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              Text(_transcript),
+              Text(
+                _lastEngineType == null
+                    ? _transcript
+                    : '$_transcript (${_engineLabel(_lastEngineType!)})',
+              ),
             ],
             if (_feedback != null) ...[
               const SizedBox(height: 16),
@@ -179,35 +188,39 @@ class _RecitationCheckScreenState extends State<RecitationCheckScreen> {
       _transcript = '';
     });
 
-    final start = await _sttService.startListening(
+    final start = await _asrCoordinator.startListening(
       onResult: (result) {
         if (!mounted) {
           return;
         }
         setState(() {
-          _transcript = result.transcript;
+          _transcript = result.text;
+          _lastEngineType = result.engineType;
         });
 
         if (result.isFinal) {
-          _analyzeRecitation(result.transcript);
+          _analyzeRecitation(result.text);
         }
       },
     );
 
-    if (start != SpeechStartOutcome.started) {
+    if (start != AsrStartOutcome.started) {
       if (!mounted) {
         return;
       }
       setState(() {
         _state = _RecitationState.error;
-        _error = _resolveSpeechError(start, _sttService.lastError);
-        _canOpenSettings = start == SpeechStartOutcome.deniedPermanently;
+        _error = _resolveSpeechError(start, _asrCoordinator.lastError);
+        _canOpenSettings = start == AsrStartOutcome.deniedPermanently;
       });
     }
   }
 
   Future<void> _stopRecitation() async {
-    await _sttService.stopListening();
+    setState(() {
+      _state = _RecitationState.processing;
+    });
+    unawaited(_asrCoordinator.stopListening());
     if (_transcript.trim().isNotEmpty) {
       _analyzeRecitation(_transcript);
       return;
@@ -215,9 +228,6 @@ class _RecitationCheckScreenState extends State<RecitationCheckScreen> {
     if (!mounted) {
       return;
     }
-    setState(() {
-      _state = _RecitationState.idle;
-    });
   }
 
   void _analyzeRecitation(String transcript) {
@@ -228,31 +238,58 @@ class _RecitationCheckScreenState extends State<RecitationCheckScreen> {
       _state = _RecitationState.processing;
     });
 
-    final feedback = _analyzer.analyze(
-      expectedText: widget.verse.ayaText,
-      recitedText: transcript,
+    unawaited(
+      _analyzeRecitationAsync(transcript).then((feedback) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _feedback = feedback;
+          _state = _RecitationState.idle;
+        });
+      }),
     );
-
-    setState(() {
-      _feedback = feedback;
-      _state = _RecitationState.idle;
-    });
   }
 
-  String _resolveSpeechError(SpeechStartOutcome outcome, String? nativeError) {
+  Future<RecitationFeedbackResult> _analyzeRecitationAsync(
+    String transcript,
+  ) async {
+    final expected = widget.verse.ayaText;
+    try {
+      return await Isolate.run(
+        () => RecitationFeedbackAnalyzer().analyze(
+          expectedText: expected,
+          recitedText: transcript,
+        ),
+      );
+    } catch (_) {
+      return _analyzer.analyze(expectedText: expected, recitedText: transcript);
+    }
+  }
+
+  String _resolveSpeechError(AsrStartOutcome outcome, String? nativeError) {
     switch (outcome) {
-      case SpeechStartOutcome.denied:
+      case AsrStartOutcome.denied:
         return nativeError ?? 'تم رفض إذن الميكروفون.';
-      case SpeechStartOutcome.deniedPermanently:
+      case AsrStartOutcome.deniedPermanently:
         return nativeError ??
             'تم رفض إذن الميكروفون بشكل دائم. فعّل الإذن من إعدادات النظام.';
-      case SpeechStartOutcome.unavailable:
+      case AsrStartOutcome.unavailable:
         return nativeError ??
             'ميزة التعرّف الصوتي غير متاحة. تأكد من تفعيل/تنزيل اللغة العربية للتعرّف الصوتي في إعدادات النظام.';
-      case SpeechStartOutcome.error:
+      case AsrStartOutcome.error:
         return nativeError ?? 'حدث خطأ غير متوقع في التعرف الصوتي.';
-      case SpeechStartOutcome.started:
+      case AsrStartOutcome.started:
         return '';
+    }
+  }
+
+  String _engineLabel(AsrEngineType engine) {
+    switch (engine) {
+      case AsrEngineType.whisperLocal:
+        return 'Whisper محلي';
+      case AsrEngineType.nativeFallback:
+        return 'STT النظام (احتياطي)';
     }
   }
 }

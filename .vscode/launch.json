@@ -20,6 +20,22 @@
       "request": "launch",
       "type": "dart",
       "flutterMode": "release"
+    },
+    {
+      "name": "irtaki (Whisper backend)",
+      "request": "launch",
+      "type": "dart",
+      "toolArgs": [
+        "--dart-define=WHISPER_API_BASE_URL=http://192.168.100.26:8000"
+      ]
+    },
+    {
+      "name": "irtaki (Whisper backend ngrok)",
+      "request": "launch",
+      "type": "dart",
+      "toolArgs": [
+        "--dart-define=WHISPER_API_BASE_URL=https://itsimad-irtaki-quran-whisper.hf.space"
+      ]
     }
   ]
 }

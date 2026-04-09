@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:isolate';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,11 +9,12 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/database/quran_dao.dart';
 import '../../core/models/verse.dart';
+import '../ai/asr/asr_coordinator.dart';
+import '../ai/asr/asr_types.dart';
+import '../ai/asr/default_asr_coordinator.dart';
 import '../ai/models/verse_match.dart';
 import '../ai/search/verse_matcher.dart';
 import '../ai/search/verse_search_index.dart';
-import '../ai/services/native_arabic_stt_service.dart';
-import '../ai/services/speech_recognition_service.dart';
 import '../settings/settings_provider.dart';
 
 enum _VoiceStatus { idle, listening, processing, error }
@@ -24,7 +28,7 @@ class SearchScreen extends ConsumerStatefulWidget {
 
 class _SearchScreenState extends ConsumerState<SearchScreen> {
   final TextEditingController _queryController = TextEditingController();
-  final NativeArabicSttService _sttService = NativeArabicSttService();
+  final AsrCoordinator _asrCoordinator = createDefaultAsrCoordinator();
   List<Verse> _results = [];
   List<VerseMatch> _rankedMatches = [];
   bool _isLoading = false;
@@ -32,6 +36,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   String _transcript = '';
   String? _voiceError;
   bool _canOpenSettings = false;
+  AsrEngineType? _lastEngineType;
   VerseMatcher? _matcher;
   Future<VerseMatcher>? _matcherFuture;
   bool _hasFinalizedCurrentListening = false;
@@ -50,7 +55,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   @override
   void dispose() {
     _queryController.dispose();
-    _sttService.dispose();
+    _asrCoordinator.dispose();
     super.dispose();
   }
 
@@ -102,37 +107,43 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       _transcript = '';
     });
 
-    final start = await _sttService.startListening(
+    final start = await _asrCoordinator.startListening(
       onResult: (result) async {
         if (!mounted) {
           return;
         }
 
         setState(() {
-          _transcript = result.transcript;
+          _transcript = result.text;
+          _lastEngineType = result.engineType;
         });
 
         if (result.isFinal && !_hasFinalizedCurrentListening) {
           _hasFinalizedCurrentListening = true;
-          await _runAiMatch(result.transcript);
+          await _runAiMatch(result.text);
         }
       },
     );
 
-    if (start != SpeechStartOutcome.started) {
+    if (start != AsrStartOutcome.started) {
       if (!mounted) {
         return;
       }
       setState(() {
         _voiceStatus = _VoiceStatus.error;
-        _voiceError = _resolveSpeechError(start, _sttService.lastError);
-        _canOpenSettings = start == SpeechStartOutcome.deniedPermanently;
+        _voiceError = _resolveSpeechError(start, _asrCoordinator.lastError);
+        _canOpenSettings = start == AsrStartOutcome.deniedPermanently;
       });
     }
   }
 
   Future<void> _stopVoiceSearch() async {
-    await _sttService.stopListening();
+    if (!_hasFinalizedCurrentListening) {
+      setState(() {
+        _voiceStatus = _VoiceStatus.processing;
+      });
+    }
+    unawaited(_asrCoordinator.stopListening());
     if (_transcript.trim().isNotEmpty && !_hasFinalizedCurrentListening) {
       _hasFinalizedCurrentListening = true;
       await _runAiMatch(_transcript);
@@ -141,9 +152,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     if (!mounted) {
       return;
     }
-    setState(() {
-      _voiceStatus = _VoiceStatus.idle;
-    });
+    if (_hasFinalizedCurrentListening) {
+      setState(() {
+        _voiceStatus = _VoiceStatus.idle;
+      });
+    }
   }
 
   Future<void> _runAiMatch(String transcript) async {
@@ -167,8 +180,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       _queryController.text = query;
     });
 
-    final matcher = await _getMatcher();
-    final matches = matcher.match(query, limit: 5);
+    final matches = await _matchWithIsolate(query, limit: 5);
 
     if (!mounted) {
       return;
@@ -193,19 +205,31 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     return _matcher!;
   }
 
-  String _resolveSpeechError(SpeechStartOutcome outcome, String? nativeError) {
+  Future<List<VerseMatch>> _matchWithIsolate(
+    String query, {
+    required int limit,
+  }) async {
+    final matcher = await _getMatcher();
+    try {
+      return await Isolate.run(() => matcher.match(query, limit: limit));
+    } catch (_) {
+      return matcher.match(query, limit: limit);
+    }
+  }
+
+  String _resolveSpeechError(AsrStartOutcome outcome, String? nativeError) {
     switch (outcome) {
-      case SpeechStartOutcome.denied:
+      case AsrStartOutcome.denied:
         return nativeError ?? 'تم رفض إذن الميكروفون.';
-      case SpeechStartOutcome.deniedPermanently:
+      case AsrStartOutcome.deniedPermanently:
         return nativeError ??
             'تم رفض إذن الميكروفون بشكل دائم. فعّل الإذن من إعدادات النظام.';
-      case SpeechStartOutcome.unavailable:
+      case AsrStartOutcome.unavailable:
         return nativeError ??
             'ميزة البحث الصوتي غير متاحة. تأكد من تفعيل/تنزيل اللغة العربية للتعرّف الصوتي في إعدادات النظام.';
-      case SpeechStartOutcome.error:
+      case AsrStartOutcome.error:
         return nativeError ?? 'حدث خطأ غير متوقع في التعرف الصوتي.';
-      case SpeechStartOutcome.started:
+      case AsrStartOutcome.started:
         return '';
     }
   }
@@ -277,7 +301,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   horizontal: 12,
                   vertical: 10,
                 ),
-                child: Text('النص الملتقط: $_transcript'),
+                child: Text(
+                  _lastEngineType == null
+                      ? 'النص الملتقط: $_transcript'
+                      : 'النص الملتقط: $_transcript (${_engineLabel(_lastEngineType!)})',
+                ),
               ),
             if (_voiceError != null && _voiceError!.isNotEmpty)
               Container(
@@ -296,6 +324,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       ),
                     ),
                     if (_canOpenSettings)
+                      // ignore: prefer_const_constructors
                       TextButton(
                         onPressed: openAppSettings,
                         child: const Text('فتح الإعدادات'),
@@ -322,7 +351,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         itemBuilder: (context, index) {
           final match = _rankedMatches[index];
           return ListTile(
-            onTap: () => context.push('/reader/${match.verse.page}'),
+            onTap: () => context.push(
+              '/reader/${match.verse.page}?verse=${match.verse.id}',
+            ),
             title: Text(
               match.matchedSnippet,
               style: TextStyle(
@@ -365,7 +396,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       itemBuilder: (context, index) {
         final verse = _results[index];
         return ListTile(
-          onTap: () => context.push('/reader/${verse.page}'),
+          onTap: () => context.push('/reader/${verse.page}?verse=${verse.id}'),
           title: Text(
             verse.ayaText,
             style: TextStyle(
@@ -396,5 +427,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         );
       },
     );
+  }
+
+  String _engineLabel(AsrEngineType engine) {
+    switch (engine) {
+      case AsrEngineType.whisperLocal:
+        return 'Whisper محلي';
+      case AsrEngineType.nativeFallback:
+        return 'STT النظام (احتياطي)';
+    }
   }
 }
